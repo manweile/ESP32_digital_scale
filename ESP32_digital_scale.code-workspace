@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+  ],
+  "settings": {
+    "terminal.integrated.env.windows": {
+      "IDF_PATH": "C:/esp/v6.0.1/esp-idf",
+      "IDF_TOOLS_PATH": "C:/Users/gmanw/.espressif"
+    },
+    "terminal.integrated.profiles.windows": {
+      "ESP-IDF PowerShell": {
+        "source": "PowerShell",
+        "args": [
+          "-NoExit"
+        ]
+      }
+    },
+    "terminal.integrated.defaultProfile.windows": "ESP-IDF PowerShell"
+  }
+}
