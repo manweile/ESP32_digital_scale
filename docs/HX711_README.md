@@ -382,7 +382,7 @@ Without this step, negative readings (object pulling the scale upward) would app
 ## Datasheet Reference
 
 - **HX711 Datasheet** (Avia Semiconductor): [https://cdn.sparkfun.com/datasheets/Sensors/ForceFlex/hx711_english.pdf](https://cdn.sparkfun.com/datasheets/Sensors/ForceFlex/hx711_english.pdf)
-- **HX711 Schematic** Sparkfun SEN-13879 Load Cell Amplifier: [https://cdn.sparkfun.com/assets/f/5/5/b/c/SparkFun_HX711_Load_Cell.pdf](https://cdn.sparkfun.com/assets/f/5/5/b/c/SparkFun_HX711_Load_Cell.pdf)
+- **HX711 Schematic** (Sparkfun SEN-13879 Load Cell Amplifier): [https://cdn.sparkfun.com/assets/f/5/5/b/c/SparkFun_HX711_Load_Cell.pdf](https://cdn.sparkfun.com/assets/f/5/5/b/c/SparkFun_HX711_Load_Cell.pdf)
 - **ESP32 Technical Reference Manual**: [https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf](https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf)
 - **ESP-IDF GPIO Driver API**: [https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/gpio.html](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/gpio.html)
 
