@@ -8,7 +8,7 @@
  *
  * Endpoints:
  *   GET  /              – Dashboard HTML page
- *   GET  /api/weight    – Current weight JSON  {"weight_g":123.4,"unit":"g"}
+ *   GET  /api/weight    – Current weight JSON  {"weight_lb":123.4,"unit":"lb"}
  *   GET  /api/status    – System info JSON
  *   POST /api/tare      – Trigger tare;        {"status":"ok"}
  *   POST /api/calibrate – Set scale factor;    body: {"scale":430.0}
@@ -51,13 +51,13 @@ esp_err_t web_server_stop(void);
  * @brief Push a weight sample to all connected SSE clients.
  *
  * Called periodically by the SSE push task. Formats the value as a
- * standard SSE message: "data: {\"weight_g\":NNN.NN}\n\n".
+ * standard SSE message: "data: {\"weight_lb\":NNN.NN}\n\n".
  *
- * @param[in] weight_g Current weight in grams.
+ * @param[in] weight_lb Current weight in pounds.
  * @return ESP_OK if at least one client received the event;
  *         ESP_ERR_NOT_FOUND if no SSE clients are connected.
  */
-esp_err_t web_server_push_weight(float weight_g);
+esp_err_t web_server_push_weight(float weight_lb);
 
 /**
  * @brief Return the number of currently active SSE connections.

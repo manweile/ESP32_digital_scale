@@ -46,8 +46,8 @@ static hx711_dev_t s_hx711;
  * Runs at CONFIG_MEASURE_TASK_PRIORITY, waking every
  * CONFIG_MEASURE_INTERVAL_MS milliseconds.  Each iteration:
  *   1. Reads CONFIG_SCALE_SAMPLES averaged ADC counts.
- *   2. Converts to grams (calibration already applied).
- *   3. Clamps readings below CONFIG_ZERO_THRESHOLD_G to 0.
+ *   2. Converts to pounds (calibration already applied).
+ *   3. Clamps readings below CONFIG_ZERO_THRESHOLD_LB to 0.
  *   4. Logs the value to the UART console.
  *   5. Pushes the value to any connected SSE browser clients.
  *
@@ -61,24 +61,23 @@ static void task_measure(void *pvParam)
     static float last_logged_weight = NAN;
 
     while (true) {
-        float grams = 0.0f;
-        esp_err_t err = hx711_get_weight(&s_hx711, CONFIG_SCALE_SAMPLES, &grams);
+        float lbs = 0.0f;
+        esp_err_t err = hx711_get_weight(&s_hx711, CONFIG_SCALE_SAMPLES, &lbs);
 
         if (err == ESP_OK) {
             /* Zero-clamp noise near tare */
-            if (grams < CONFIG_ZERO_THRESHOLD_G && grams > -CONFIG_ZERO_THRESHOLD_G) {
-                grams = 0.0f;
+            if (lbs < CONFIG_ZERO_THRESHOLD_LB && lbs > -CONFIG_ZERO_THRESHOLD_LB) {
+                lbs = 0.0f;
             }
 
-            /* Only log when the value changes by at least 0.01 g to
+            /* Only log when the value changes by at least 0.01 lb to
              * avoid spamming the UART with identical readings. */
-            if (isnan(last_logged_weight) || fabsf(grams - last_logged_weight) >= 0.01f) {
-                ESP_LOGI(TAG, "Weight: %.2f g  (%.3f kg  /  %.3f lb)",
-                         grams, grams / 1000.0f, grams / 453.592f);
-                last_logged_weight = grams;
+            if (isnan(last_logged_weight) || fabsf(lbs - last_logged_weight) >= 0.01f) {
+                ESP_LOGI(TAG, "Weight: %.2f lb", lbs);
+                last_logged_weight = lbs;
             }
 
-            web_server_push_weight(grams);
+            web_server_push_weight(lbs);
         } else {
             ESP_LOGW(TAG, "HX711 read error: %s", esp_err_to_name(err));
         }

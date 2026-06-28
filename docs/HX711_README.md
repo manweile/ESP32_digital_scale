@@ -8,25 +8,34 @@
 
 ## Table of Contents
 
-1. [What Is the HX711?](#what-is-the-hx711)
-2. [Internal Block Diagram](#internal-block-diagram)
-3. [Load Cell Fundamentals](#load-cell-fundamentals)
-   - [Half-Bridge vs Full-Bridge](#half-bridge-vs-full-bridge)
-   - [Combining Four Half-Bridge Cells](#combining-four-half-bridge-cells)
-4. [HX711 Pin Description](#hx711-pin-description)
-5. [Power Supply Considerations](#power-supply-considerations)
-6. [Channel and Gain Selection](#channel-and-gain-selection)
-7. [Output Data Rate](#output-data-rate)
-8. [Serial Communication Protocol](#serial-communication-protocol)
-   - [Timing Diagram](#timing-diagram)
-   - [Data Format](#data-format)
-   - [Gain-Select Pulse Count](#gain-select-pulse-count)
-9. [Power-Down Mode](#power-down-mode)
-10. [Noise and Resolution](#noise-and-resolution)
-11. [Calibration Mathematics](#calibration-mathematics)
-12. [Driver Implementation Notes](#driver-implementation-notes)
-13. [Common Mistakes](#common-mistakes)
-14. [Datasheet Reference](#datasheet-reference)
+- [HX711 Amplifier – Technical Reference](#hx711-amplifier--technical-reference)
+  - [Table of Contents](#table-of-contents)
+  - [What Is the HX711?](#what-is-the-hx711)
+  - [Internal Block Diagram](#internal-block-diagram)
+  - [Load Cell Fundamentals](#load-cell-fundamentals)
+    - [Half-Bridge vs Full-Bridge](#half-bridge-vs-full-bridge)
+    - [Combining Four Half-Bridge Cells](#combining-four-half-bridge-cells)
+  - [HX711 Pin Description](#hx711-pin-description)
+  - [Power Supply Considerations](#power-supply-considerations)
+  - [Channel and Gain Selection](#channel-and-gain-selection)
+  - [Output Data Rate](#output-data-rate)
+  - [Serial Communication Protocol](#serial-communication-protocol)
+    - [Timing Diagram](#timing-diagram)
+    - [Data Format](#data-format)
+    - [Gain-Select Pulse Count](#gain-select-pulse-count)
+  - [Power-Down Mode](#power-down-mode)
+  - [Noise and Resolution](#noise-and-resolution)
+  - [Calibration Mathematics](#calibration-mathematics)
+    - [1. Tare Offset](#1-tare-offset)
+    - [2. Scale Factor](#2-scale-factor)
+    - [Weight Calculation](#weight-calculation)
+  - [Driver Implementation Notes](#driver-implementation-notes)
+    - [Why IRAM?](#why-iram)
+    - [Why `portDISABLE_INTERRUPTS()`?](#why-portdisable_interrupts)
+    - [Why `ets_delay_us()` Instead of `vTaskDelay()`?](#why-ets_delay_us-instead-of-vtaskdelay)
+    - [Sign Extension](#sign-extension)
+  - [Common Mistakes](#common-mistakes)
+  - [Datasheet Reference](#datasheet-reference)
 
 ---
 
@@ -37,7 +46,7 @@ The **HX711** is a precision 24-bit analog-to-digital converter (ADC) designed s
 Key specifications:
 
 | Parameter | Value |
-|-----------|-------|
+| ----------- | ------- |
 | ADC resolution | 24 bits |
 | Input channels | 2 (A and B) |
 | Channel A gain | 64 or 128 (selectable) |
@@ -53,7 +62,7 @@ Key specifications:
 
 ## Internal Block Diagram
 
-```
+```text
                        ┌───────────────────────────────────┐
                        │             HX711                  │
   E+ ─────────────────►│ REG ─► AVDD                       │
@@ -84,13 +93,13 @@ A **strain gauge load cell** works by bonding metallic foil resistors to a metal
 
 A **half-bridge** cell has two active gauges (one in tension, one in compression). Its differential output signal is:
 
-```
+```text
 V_out = (V_EXC / 2) × (ΔR / R)
 ```
 
 A **full Wheatstone bridge** uses four gauges (two in tension, two in compression) and doubles the output signal:
 
-```
+```text
 V_out = V_EXC × (ΔR / R)
 ```
 
@@ -100,7 +109,7 @@ More signal → better resolution and noise immunity.
 
 The four 50 kg half-bridge cells used in this project are wired to form a **single full Wheatstone bridge**:
 
-```
+```text
          E+ ──────┬──────────────────┬────── E+
                   │                  │
              Cell 1 (tension)   Cell 2 (tension)
@@ -117,7 +126,7 @@ The four 50 kg half-bridge cells used in this project are wired to form a **sing
 **Practical wiring:**
 
 | HX711 terminal | What to connect |
-|----------------|-----------------|
+| ---------------- | ----------------- |
 | E+ | Red wires of Cells 1 & 3 (tied together) |
 | E− | Black wires of Cells 1 & 3 (tied together) |
 | A+ | White wires of Cells 2 & 4 (tied together) |
@@ -132,7 +141,7 @@ With this arrangement the four cells share the mechanical load and their signals
 ## HX711 Pin Description
 
 | Pin | Name | Direction | Description |
-|-----|------|-----------|-------------|
+| ----- | ------ | ----------- | ------------- |
 | 1 | VSUP | Power | Analog supply (2.6 – 5.5 V) |
 | 2 | BASE | Output | Internal bias (connect 100 nF to GND) |
 | 3 | AGND | Power | Analog ground |
@@ -166,7 +175,7 @@ With this arrangement the four cells share the mechanical load and their signals
 The HX711 supports two input channels with different gain settings:
 
 | Channel | Gain | Input range (at 3.3 V supply) |
-|---------|------|-------------------------------|
+| --------- | ------ | ------------------------------- |
 | A | 128 | ±20 mV |
 | A | 64 | ±40 mV |
 | B | 32 | ±80 mV |
@@ -180,7 +189,7 @@ This project always uses **Channel A, Gain 128** (`HX711_GAIN_A_128`) for maximu
 The RATE pin controls the conversion speed:
 
 | RATE pin level | Conversions per second |
-|----------------|------------------------|
+| ---------------- | ------------------------ |
 | LOW (or floating) | 10 Hz |
 | HIGH | 80 Hz |
 
@@ -197,7 +206,7 @@ The HX711 uses a **custom 2-wire synchronous serial protocol** driven entirely b
 
 ### Timing Diagram
 
-```
+```text
 DOUT  ─────┐                                                              ┌─────
            │   Conversion    │<──────────── 24 data bits ──────────────>│
            └─────────────────┘
@@ -218,7 +227,8 @@ T3 (DOUT valid after SCK falls) ≤ 0.1 µs — data is stable before host sampl
 The HX711 outputs a **24-bit two's complement** value, MSB first. After sign extension to 32 bits, the value ranges from −8 388 608 to +8 388 607.
 
 Example:
-```
+
+```text
 Received bits: 0b 0000 0110 1001 1110 0000 1010  (hex: 0x069E0A)
 Decimal: 432 650
 Meaning: 432 650 raw counts above the negative full-scale
@@ -229,7 +239,7 @@ Meaning: 432 650 raw counts above the negative full-scale
 After the 24 data bits are clocked out, the master sends **1, 2, or 3 additional SCK pulses** to select the gain for the *next* conversion:
 
 | Extra pulses | Next conversion gain |
-|---|---|
+| --- | --- |
 | 1 | Channel A, gain 128 |
 | 2 | Channel B, gain 32 |
 | 3 | Channel A, gain 64 |
@@ -263,7 +273,7 @@ To wake up, drive PD_SCK LOW. The HX711 requires approximately **400 ms** after 
 
 At 24-bit resolution the theoretical LSB size is:
 
-```
+```text
 LSB = V_FS / 2^24 / Gain
     = 20 mV / 16 777 216 / 128
     ≈ 0.000 000 93 V  (< 1 nV per count)
@@ -271,7 +281,7 @@ LSB = V_FS / 2^24 / Gain
 
 In practice, thermal noise, board layout, and power supply noise limit effective resolution to roughly **20–21 effective bits**, which corresponds to:
 
-```
+```text
 Effective counts ≈ 2^20 = 1 048 576
 Weight resolution ≈ 200 000 g / 1 048 576 ≈ 0.19 g
 ```
@@ -291,14 +301,16 @@ Raw ADC values are converted to physical weight using two parameters:
 ### 1. Tare Offset
 
 Captured with no load on the scale:
-```
+
+```text
 tare = average_raw_counts_with_empty_platform
 ```
 
 ### 2. Scale Factor
 
 Captured with a known reference weight W_ref on the platform:
-```
+
+```text
 raw_loaded = average_raw_counts_with_W_ref
 delta      = raw_loaded - tare
 scale      = delta / W_ref      [units: counts per gram]
@@ -306,14 +318,14 @@ scale      = delta / W_ref      [units: counts per gram]
 
 ### Weight Calculation
 
-```
+```text
 weight_g = (raw_reading - tare) / scale
 ```
 
 **Worked example:**
 
 | Step | Value |
-|------|-------|
+| ------ | ------- |
 | Tare (empty) | −47 382 counts |
 | Loaded with 1000 g | 383 618 counts |
 | Delta | 431 000 counts |
@@ -354,7 +366,7 @@ Without this step, negative readings (object pulling the scale upward) would app
 ## Common Mistakes
 
 | Symptom | Likely Cause | Fix |
-|---------|-------------|-----|
+| --------- | ------------- | ----- |
 | Always reads max positive | A+ / A− swapped | Swap the bridge signal wires |
 | Always reads max negative | E+ / E− swapped | Swap the excitation wires |
 | Readings jump erratically | Loose connection or poor ground | Check all solder joints; add decoupling cap |

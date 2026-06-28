@@ -221,15 +221,16 @@ esp_err_t hx711_get_scale(const hx711_dev_t *dev, float *scale)
 /**
  * @brief Read calibrated weight in grams.
  */
-esp_err_t hx711_get_weight(hx711_dev_t *dev, uint8_t samples, float *grams)
+esp_err_t hx711_get_weight(hx711_dev_t *dev, uint8_t samples, float *pounds)
 {
     int32_t avg = 0;
     esp_err_t err = hx711_read_average(dev, samples, &avg);
     if (err != ESP_OK) return err;
 
-    *grams = (float)(avg - dev->tare) / dev->scale;
-    ESP_LOGD(TAG, "weight=%.2f g (avg=%" PRId32 " tare=%" PRId32 " scale=%.4f)",
-             *grams, avg, dev->tare, dev->scale);
+    /* Calculate pounds: scale is counts per pound */
+    *pounds = (float)(avg - dev->tare) / dev->scale;
+    ESP_LOGD(TAG, "weight=%.2f lb (avg=%" PRId32 " tare=%" PRId32 " scale=%.4f)",
+             *pounds, avg, dev->tare, dev->scale);
     return ESP_OK;
 }
 

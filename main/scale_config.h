@@ -34,14 +34,14 @@
 /** Samples averaged during a tare operation. */
 #define CONFIG_TARE_SAMPLES           20
 
-/** Default scale factor (raw counts per gram). Replace after calibration. */
+/** Default scale factor (raw counts per pound). Replace after calibration. */
 #define CONFIG_SCALE_FACTOR           -10420.86f
 
-/** Full-scale capacity in grams (4 × 50 000 g). */
-#define CONFIG_MAX_WEIGHT_G           200000.0f
+/** Full-scale capacity in pounds (4 × 50 000 g ≈ 440.9 lb). */
+#define CONFIG_MAX_WEIGHT_LB          440.9245f
 
-/** Readings below this threshold are displayed as 0.00 g. */
-#define CONFIG_ZERO_THRESHOLD_G       2.0f
+/** Readings below this threshold are displayed as 0.00 lb. */
+#define CONFIG_ZERO_THRESHOLD_LB      2.0f
 
 /* ── Wi-Fi ────────────────────────────────────────────────────────── */
 

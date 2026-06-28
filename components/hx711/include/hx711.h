@@ -65,7 +65,7 @@ typedef struct {
 typedef struct {
     hx711_config_t cfg;   /**< Copy of user-supplied hardware config */
     int32_t        tare;  /**< Raw ADC offset captured during tare   */
-    float          scale; /**< raw-count-per-gram conversion factor  */
+    float          scale; /**< raw-count-per-pound conversion factor  */
 } hx711_dev_t;
 
 /* ── API ──────────────────────────────────────────────────────────── */
@@ -141,10 +141,10 @@ esp_err_t hx711_read_average(hx711_dev_t *dev, uint8_t samples, int32_t *avg);
 esp_err_t hx711_tare(hx711_dev_t *dev, uint8_t samples);
 
 /**
- * @brief Set the calibration scale factor (raw counts per gram).
+ * @brief Set the calibration scale factor (raw counts per pound).
  *
  * Determine this once during calibration:
- *   scale = (avg_with_known_weight − tare) / known_weight_grams
+ *   scale = (avg_with_known_weight − tare) / known_weight_pounds
  *
  * @param[in] dev   Initialised device handle.
  * @param[in] scale Non-zero conversion factor.
@@ -162,16 +162,16 @@ esp_err_t hx711_set_scale(hx711_dev_t *dev, float scale);
 esp_err_t hx711_get_scale(const hx711_dev_t *dev, float *scale);
 
 /**
- * @brief Read calibrated weight in grams.
+ * @brief Read calibrated weight in pounds.
  *
- * weight_g = (average_raw − tare) / scale
+ * weight_lb = (average_raw − tare) / scale
  *
  * @param[in]  dev     Initialised device handle.
  * @param[in]  samples Samples to average.
- * @param[out] grams   Calculated weight in grams.
+ * @param[out] pounds  Calculated weight in pounds.
  * @return ESP_OK on success; propagated error otherwise.
  */
-esp_err_t hx711_get_weight(hx711_dev_t *dev, uint8_t samples, float *grams);
+esp_err_t hx711_get_weight(hx711_dev_t *dev, uint8_t samples, float *pounds);
 
 /**
  * @brief Power down the HX711 (SCK held HIGH > 60 µs, ≈1 µA standby).

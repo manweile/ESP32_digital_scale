@@ -27,6 +27,7 @@
 #include "lwip/sockets.h"
 #include <errno.h>
 #include "lwip/sys.h"
+#include <stdlib.h>
 
 static const char *TAG = "WEB_SERVER";
 
@@ -34,7 +35,7 @@ static const char *TAG = "WEB_SERVER";
 
 static httpd_handle_t  s_server     = NULL;
 static hx711_dev_t    *s_dev        = NULL;
-static float           s_last_weight_g = 0.0f;
+static float           s_last_weight_lb = 0.0f;
 static SemaphoreHandle_t s_weight_mutex = NULL;
 
 /* Track open SSE client request handles (one per blocking handler) */
@@ -215,10 +216,8 @@ static const char DASHBOARD_HTML[] =
 "const MAX_HIST=120;" /* 60s @ 500ms */
 
 "/* -- Unit conversion -- */"
-"function toUnit(g){"
-"if(unit==='kg')return(g/1000).toFixed(3);"
-"if(unit==='lb')return(g/453.592).toFixed(3);"
-"return g.toFixed(1);"
+"function toUnit(lb){"
+"return lb.toFixed(2);"
 "}"
 "function setUnit(u){"
 "unit=u;"
@@ -240,24 +239,24 @@ static const char DASHBOARD_HTML[] =
 "}"
 
 "/* -- Weight update -- */"
-"function updateWeight(g){"
+"function updateWeight(lb){"
 "  const val_el=document.getElementById('weight-value');"
 "  const unit_el=document.getElementById('weight-unit');"
 "  if(!val_el || !unit_el) return; /* defensive: avoid exceptions if DOM missing */"
-"  val_el.textContent=toUnit(g);"
+"  val_el.textContent=toUnit(lb);"
 "  unit_el.textContent=' '+unit;"
-"  val_el.style.color=Math.abs(g)<2?'var(--muted)':'var(--text)';"
+"  val_el.style.color=Math.abs(lb)<2?'var(--muted)':'var(--text)';"
 "  /* stats */"
-"  if(g<minW)minW=g;"
-"  if(g>maxW)maxW=g;"
-"  sumW+=g;countW++;"
+"  if(lb<minW)minW=lb;"
+"  if(lb>maxW)maxW=lb;"
+"  sumW+=lb;countW++;"
 "  updateStats();"
 "  /* chart */"
 "  const now=new Date();"
 "  const label=now.getHours().toString().padStart(2,'0')+':'"
 "    +now.getMinutes().toString().padStart(2,'0')+':'"
 "    +now.getSeconds().toString().padStart(2,'0');"
-"  history.push({t:label,v:g});"
+"  history.push({t:label,v:lb});"
 "  if(history.length>MAX_HIST)history.shift();"
 "  chart.data.labels=history.map(h=>h.t);"
 "  chart.data.datasets[0].data=history.map(h=>h.v);"
@@ -285,9 +284,13 @@ static const char DASHBOARD_HTML[] =
 "    src.addEventListener('weight',e=>{"
 "      try{"
 "        const d=JSON.parse(e.data);"
-"        let grams = parseFloat(d.weight_g);"
-"        if (d.unit && d.unit==='lb') grams = grams * 453.592;"
-"        updateWeight(grams);"
+"        let lbs = 0.0;"
+"        if (d.weight_lb !== undefined) {"
+"          lbs = parseFloat(d.weight_lb);"
+"        } else if (d.weight_g !== undefined) {"
+"          lbs = parseFloat(d.weight_g) / 453.59237;"
+"        }"
+"        updateWeight(lbs);"
 "      }catch(ex){ console.error('SSE parse error', ex, e.data); }"
 "    });"
 "  }catch(ex){ console.error('connectSSE failed', ex); setTimeout(connectSSE, __sse_backoff); }"
@@ -436,7 +439,7 @@ static esp_err_t handler_root(httpd_req_t *req)
 /**
  * @brief Return the latest weight as a JSON object.
  *
- * Response body: {"weight_g": 123.45, "unit": "g"}
+ * Response body: {"weight_lb": 123.45, "unit": "lb"}
  *
  * @param[in] req Incoming HTTP request handle.
  * @return ESP_OK on success.
@@ -445,12 +448,12 @@ static esp_err_t handler_api_weight(httpd_req_t *req)
 {
     float w = 0.0f;
     xSemaphoreTake(s_weight_mutex, portMAX_DELAY);
-    w = s_last_weight_g;
+    w = s_last_weight_lb;
     xSemaphoreGive(s_weight_mutex);
 
     char buf[64];
-    /* Return the measured value in grams (canonical internal unit). */
-    snprintf(buf, sizeof(buf), "{\"weight_g\":%.2f,\"unit\":\"g\"}", w);
+    /* Return the measured value in pounds (canonical internal unit). */
+    snprintf(buf, sizeof(buf), "{\"weight_lb\":%.2f,\"unit\":\"lb\"}", w);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, buf, strlen(buf));
     return ESP_OK;
@@ -475,7 +478,7 @@ static esp_err_t handler_api_tare(httpd_req_t *req)
     }
 
     xSemaphoreTake(s_weight_mutex, portMAX_DELAY);
-    s_last_weight_g = 0.0f;
+    s_last_weight_lb = 0.0f;
     xSemaphoreGive(s_weight_mutex);
 
     httpd_resp_set_type(req, "application/json");
@@ -688,22 +691,22 @@ esp_err_t web_server_stop(void)
  * @brief Push a weight reading to all active SSE clients.
  *
  * Formats the message as SSE with a named event type "weight":
- *   event: weight\ndata: {"weight_g":NNN.NN}\n\n
+ *   event: weight\ndata: {"weight_lb":NNN.NN}\n\n
  * Failed sends on individual sockets remove those clients automatically.
  */
-esp_err_t web_server_push_weight(float weight_g)
+esp_err_t web_server_push_weight(float weight_lb)
 {
     /* Cache latest value for REST endpoint */
     xSemaphoreTake(s_weight_mutex, portMAX_DELAY);
-    s_last_weight_g = weight_g;
+    s_last_weight_lb = weight_lb;
     xSemaphoreGive(s_weight_mutex);
 
     if (s_sse_count == 0) return ESP_ERR_NOT_FOUND;
 
     char msg[80];
     int  msg_len = snprintf(msg, sizeof(msg),
-                            "event: weight\ndata: {\"weight_g\":%.2f,\"unit\":\"g\"}\n\n",
-                            weight_g);
+                            "event: weight\ndata: {\"weight_lb\":%.2f,\"unit\":\"lb\"}\n\n",
+                            weight_lb);
 
     xSemaphoreTake(s_sse_mutex, portMAX_DELAY);
     for (int i = 0; i < MAX_SSE_CLIENTS; i++) {
