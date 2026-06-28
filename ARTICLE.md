@@ -74,12 +74,13 @@ The practical connection to the HX711 module:
 ### 1.3 HX711 to ESP32 Wiring
 
 ```text
-ESP32           HX711 Module
-─────────          ────────────
-GPIO 4   ────────► DOUT  (data output)
-GPIO 5   ────────► SCK   (serial clock / PD_SCK)
-3V3      ────────► VCC
-GND      ────────► GND
+ESP32               HX711 Module
+─────────           ────────────
+GPIO 16   ────────► DOUT  (data output)
+GPIO 17   ────────► SCK   (serial clock / PD_SCK)
+5V        ────────► VCC
+3V3       ────────► VDD
+GND       ────────► GND
                    E+  ────► bridge E+
                    E−  ────► bridge E−
                    A+  ────► bridge A+
@@ -298,13 +299,13 @@ tare = average_raw(empty_platform, N)
 
 ```text
 raw_loaded = average_raw(W_ref, N)
-scale      = (raw_loaded − tare) / W_ref    [units: counts per gram]
+scale      = (raw_loaded − tare) / W_ref    [units: counts per lb]
 ```
 
 At runtime:
 
 ```text
-weight_g = (raw_reading − tare) / scale
+weight_lb = (raw_reading − tare) / scale
 ```
 
 This is a single-point linear calibration. It assumes the load cell is linear (which all quality strain-gauge cells are, to well within 0.05% over the rated range) and that the single reference weight was placed at the effective centre of the platform.
@@ -318,39 +319,71 @@ esp_err_t calibration_run(hx711_dev_t *dev)
 {
     char buf[32];
 
-    // Step 1: Tare with empty platform
+    printf("\n========================================\n");
+    printf("      Digital Scale Calibration Wizard  \n");
+    printf("========================================\n\n");
+
+    /* ── Step 1: Tare ── */
     printf("[1/3] Remove ALL weight from the platform.\n");
     printf("      Press ENTER when ready...\n");
     read_line(buf, sizeof(buf));
 
+    printf("      Capturing tare (%d samples)...\n", CONFIG_TARE_SAMPLES);
     esp_err_t err = hx711_tare(dev, CONFIG_TARE_SAMPLES);
-    if (err != ESP_OK) return err;
-    printf("      Tare: %" PRId32 " raw counts\n\n", dev->tare);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Tare failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    printf("      Tare captured: %" PRId32 " raw counts\n\n", dev->tare);
 
-    // Step 2: Measure known reference weight
-    printf("[2/3] Enter reference weight in grams: ");
+    /* ── Step 2: Known weight ── */
+    printf("[2/3] Enter the reference weight in grams (e.g. 1000): ");
     fflush(stdout);
     read_line(buf, sizeof(buf));
 
     float ref_grams = 0.0f;
-    if (sscanf(buf, "%f", &ref_grams) != 1 || ref_grams <= 0.0f)
+    if (sscanf(buf, "%f", &ref_grams) != 1 || ref_grams <= 0.0f) {
+        ESP_LOGE(TAG, "Invalid reference weight: '%s'", buf);
         return ESP_ERR_INVALID_ARG;
+    }
 
-    printf("      Place %.1f g on the platform, press ENTER...\n", ref_grams);
+    printf("      Place the %.1f g reference weight on the platform.\n", ref_grams);
+    printf("      Press ENTER when ready...\n");
     read_line(buf, sizeof(buf));
 
+    printf("      Measuring (%d samples)...\n", CONFIG_TARE_SAMPLES);
     int32_t avg_loaded = 0;
     err = hx711_read_average(dev, CONFIG_TARE_SAMPLES, &avg_loaded);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Measurement failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    int32_t delta = avg_loaded - dev->tare;
+    if (delta == 0) {
+        ESP_LOGE(TAG, "No change detected; check wiring.");
+        return ESP_FAIL;
+    }
+
+    float new_scale = (float)delta / ref_grams;
+    err = hx711_set_scale(dev, new_scale);
     if (err != ESP_OK) return err;
 
-    int32_t delta     = avg_loaded - dev->tare;
-    float   new_scale = (float)delta / ref_grams;
-    hx711_set_scale(dev, new_scale);
+    printf("      Loaded avg : %" PRId32 " raw counts\n", avg_loaded);
+    printf("      Delta      : %" PRId32 " raw counts\n", delta);
+    printf("      Scale factor: %.4f counts/g\n\n", new_scale);
 
-    printf("      delta=%"PRId32"  scale=%.4f counts/g\n\n", delta, new_scale);
+    /* ── Step 3: Save ── */
+    printf("[3/3] Saving calibration to NVS...\n");
+    err = calibration_save(dev);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS save failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
-    // Step 3: Persist to NVS
-    return calibration_save(dev);
+    printf("      Calibration saved successfully!\n");
+    printf("========================================\n\n");
+    return ESP_OK;
 }
 ```
 
@@ -420,8 +453,7 @@ The Wi-Fi manager uses a FreeRTOS EventGroup to turn the asynchronous connection
 static EventGroupHandle_t s_wifi_event_group;
 static int                s_retry_count = 0;
 
-static void wifi_event_handler(void *arg, esp_event_base_t base,
-                               int32_t id, void *data)
+static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
@@ -615,31 +647,28 @@ static esp_err_t handler_sse(httpd_req_t *req)
 ```c
 // main/web_server.c
 
-esp_err_t web_server_push_weight(float weight_g)
+esp_err_t web_server_push_weight(float weight_lb)
 {
-    // Update the cached value for the REST /api/weight endpoint
+    /* Cache latest value for REST endpoint */
     xSemaphoreTake(s_weight_mutex, portMAX_DELAY);
-    s_last_weight_g = weight_g;
+    s_last_weight_lb = weight_lb;
     xSemaphoreGive(s_weight_mutex);
 
     if (s_sse_count == 0) return ESP_ERR_NOT_FOUND;
 
-    // SSE wire format:
-    //   event: <name>\n
-    //   data:  <payload>\n
-    //   \n                  ← blank line terminates the event
     char msg[80];
-    int  len = snprintf(msg, sizeof(msg),
-                        "event: weight\ndata: {\"weight_g\":%.2f}\n\n",
-                        weight_g);
+    int  msg_len = snprintf(msg, sizeof(msg),
+                            "event: weight\ndata: {\"weight_lb\":%.2f,\"unit\":\"lb\"}\n\n",
+                            weight_lb);
 
     xSemaphoreTake(s_sse_mutex, portMAX_DELAY);
     for (int i = 0; i < MAX_SSE_CLIENTS; i++) {
-        if (s_sse_fds[i] < 0) continue;
-        if (lwip_send(s_sse_fds[i], msg, len, MSG_DONTWAIT) < 0) {
-            // Socket is dead. Mark it free; handler_sse() will call
-            // sse_remove_client() when it unblocks from select().
-            s_sse_fds[i] = -1;
+        if (s_sse_reqs[i] == NULL) continue;
+        esp_err_t r = httpd_resp_send_chunk(s_sse_reqs[i], msg, msg_len);
+        if (r != ESP_OK) {
+            int fd = httpd_req_to_sockfd(s_sse_reqs[i]);
+            ESP_LOGW(TAG, "SSE send failed fd=%d (httpd_resp_send_chunk r=%d); removing", fd, r);
+            s_sse_reqs[i] = NULL;
             s_sse_count--;
         }
     }
@@ -647,6 +676,7 @@ esp_err_t web_server_push_weight(float weight_g)
 
     return ESP_OK;
 }
+
 ```
 
 `MSG_DONTWAIT` is important here. This function is called from `task_measure`, not from the HTTP server's task pool. A blocking `send()` to a slow or stalled client would delay the measurement loop for all other clients. With `MSG_DONTWAIT`, a full send buffer causes an immediate `EAGAIN` error, which is treated identically to a dead socket: the client is removed.
@@ -688,26 +718,33 @@ function connectSSE() {
 
 static void task_measure(void *pvParam)
 {
+    ESP_LOGI(TAG, "Measurement task started");
+
     TickType_t last_wake = xTaskGetTickCount();
+    static float last_logged_weight = NAN;
 
     while (true) {
-        float grams = 0.0f;
-        esp_err_t err = hx711_get_weight(&s_hx711, CONFIG_SCALE_SAMPLES, &grams);
+        float lbs = 0.0f;
+        esp_err_t err = hx711_get_weight(&s_hx711, CONFIG_SCALE_SAMPLES, &lbs);
 
         if (err == ESP_OK) {
-            // Zero-clamp: suppress sub-2 g fluctuations around tare
-            if (grams > -CONFIG_ZERO_THRESHOLD_G && grams < CONFIG_ZERO_THRESHOLD_G)
-                grams = 0.0f;
+            /* Zero-clamp noise near tare */
+            if (lbs < CONFIG_ZERO_THRESHOLD_LB && lbs > -CONFIG_ZERO_THRESHOLD_LB) {
+                lbs = 0.0f;
+            }
 
-            ESP_LOGI(TAG, "Weight: %.2f g  (%.3f kg / %.3f lb)",
-                     grams, grams / 1000.0f, grams / 453.592f);
+            /* Only log when the value changes by at least 0.01 lb to
+             * avoid spamming the UART with identical readings. */
+            if (isnan(last_logged_weight) || fabsf(lbs - last_logged_weight) >= 0.01f) {
+                ESP_LOGI(TAG, "Weight: %.2f lb", lbs);
+                last_logged_weight = lbs;
+            }
 
-            web_server_push_weight(grams);
+            web_server_push_weight(lbs);
         } else {
-            ESP_LOGW(TAG, "HX711 error: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "HX711 read error: %s", esp_err_to_name(err));
         }
 
-        // vTaskDelayUntil gives deterministic period regardless of loop body duration
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(CONFIG_MEASURE_INTERVAL_MS));
     }
 }
@@ -864,6 +901,6 @@ The complete project — driver, application, calibration wizard, web server, an
 
 - Avia Semiconductor. *HX711 24-Bit Analog-to-Digital Converter for Weigh Scales.* Datasheet, Rev 1.0.
 - Espressif Systems. *ESP32 Technical Reference Manual.* Rev 1.3. 2023.
--- Espressif Systems. *ESP-IDF Programming Guide v5.x.* [docs.espressif.com](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)
+- Espressif Systems. *ESP-IDF Programming Guide v5.x.* [docs.espressif.com](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)
 - W3C. *Server-Sent Events.* W3C Recommendation. [w3.org/TR/eventsource](https://www.w3.org/TR/eventsource/)
 - National Instruments. *Strain Gauge Measurement – A Tutorial.* Application Note 078, 1998.

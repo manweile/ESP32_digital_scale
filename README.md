@@ -13,38 +13,41 @@ A production-ready **ESP-IDF** project that turns an **ESP32** microcontroller, 
 
 ## Table of Contents
 
-1. [Features](#features)
-2. [Hardware](#hardware)
-   - [Bill of Materials](#bill-of-materials)
-      - [Wiring the Load Cells](#wiring-the-load-cells)
-      - [HX711 to ESP32 Connection](#hx711-to-esp32-connection)
-   - [Schematic Overview](#schematic-overview)
-3. [Web Dashboard](#web-dashboard)
-4. [REST API](#rest-api)
-5. [Project Structure](#project-structure)
-6. [Getting Started](#getting-started)
-   - [Prerequisites](#prerequisites)
-   - [Clone & Configure](#clone--configure)
-   - [Build & Flash](#build--flash)
-   - [Monitor](#monitor)
-7. [Calibration](#calibration)
-   - [Why Calibration Is Needed](#why-calibration-is-needed)
-   - [Step-by-Step Calibration](#step-by-step-calibration)
-   - [Calibration via Web API](#calibration-via-web-api)
-8. [Configuration Reference](#configuration-reference)
-9. [Architecture](#architecture)
-   - [Task Diagram](#task-diagram)
-   - [Component Dependencies](#component-dependencies)
-10. [Troubleshooting](#troubleshooting)
-11. [Contributing](#contributing)
-12. [License](#license)
+- [ESP32 Digital Scale](#esp32-digital-scale)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Hardware](#hardware)
+    - [Bill of Materials](#bill-of-materials)
+    - [Wiring the Load Cells](#wiring-the-load-cells)
+    - [HX711 to ESP32 Connection](#hx711-to-esp32-connection)
+    - [Schematic Overview](#schematic-overview)
+  - [Web Dashboard](#web-dashboard)
+  - [REST API](#rest-api)
+    - [Example curl commands](#example-curl-commands)
+  - [Project Structure](#project-structure)
+  - [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+    - [Clone \& Configure](#clone--configure)
+    - [Build \& Flash](#build--flash)
+    - [Monitor](#monitor)
+  - [Calibration](#calibration)
+    - [Why Calibration Is Needed](#why-calibration-is-needed)
+    - [Step-by-Step Calibration](#step-by-step-calibration)
+    - [Calibration Tips](#calibration-tips)
+  - [Configuration Reference](#configuration-reference)
+  - [Architecture](#architecture)
+    - [Task Diagram](#task-diagram)
+    - [Component Dependencies](#component-dependencies)
+  - [Troubleshooting](#troubleshooting)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
 ## Features
 
 | Feature | Detail |
-|---|---|
+| --- | --- |
 | **24-bit resolution** | HX711 at gain 128 on Channel A → ≈ 0.5 g resolution over 200 kg |
 | **Noise reduction** | Configurable multi-sample averaging (default 10 samples) |
 | **Live web dashboard** | Single-page app served directly from the ESP32 flash – no internet required |
@@ -66,7 +69,7 @@ A production-ready **ESP-IDF** project that turns an **ESP32** microcontroller, 
 ### Bill of Materials
 
 | Qty | Component | Notes |
-|-----|-----------|-------|
+| ----- | ----------- | ------- |
 | 1 | ESP32 development board | Any variant with ≥ 4 MB flash; DevKitC-1 recommended |
 | 4 | 50 kg Half-Bridge Load Cell / Strain Gauge | "Human body scale" type |
 | 1 | HX711 Amplifier Module | 24-bit ADC, 80 Hz output rate at 3.3 V supply |
@@ -78,18 +81,18 @@ A production-ready **ESP-IDF** project that turns an **ESP32** microcontroller, 
 
 Four **half-bridge** load cells are combined into a single **full Wheatstone bridge** before connecting to the HX711. This is the standard body-scale configuration:
 
-```
+```text
               ┌─────────────────────────────────┐
-              │         Full Bridge              │
-              │                                  │
-  Cell 1 RED ─┤ E+                          A+ ├─ Cell 2 WHITE
-              │                                  │
-  Cell 1 BLK ─┤ E-                          A- ├─ Cell 2 BLACK
-              │                                  │
+              │         Full Bridge             │
+              │                                 │
+  Cell 1 RED ─┤ E+                           A+ ├─ Cell 2 WHITE
+              │                                 │
+  Cell 1 BLK ─┤ E-                           A- ├─ Cell 2 BLACK
+              │                                 │
   Cell 3 RED ─┤ (parallel E+)      (parallel A+)├─ Cell 4 WHITE
-              │                                  │
+              │                                 │
   Cell 3 BLK ─┤ (parallel E-)      (parallel A-)├─ Cell 4 BLACK
-              └──────────┬──────────┬────────────┘
+              └──────────┬──────────┬───────────┘
                          │          │
                       Cell wire   Cell wire
                       colours may vary by manufacturer
@@ -98,7 +101,7 @@ Four **half-bridge** load cells are combined into a single **full Wheatstone bri
 **Practical connection summary:**
 
 | HX711 Pin | Wire colour (typical) | Connected cells |
-|-----------|----------------------|-----------------|
+| ----------- | ---------------------- | ----------------- |
 | E+ (EXCITATION +) | Red | Cells 1 & 3 red wires joined |
 | E- (EXCITATION −) | Black | Cells 1 & 3 black wires joined |
 | A+ (SIGNAL +) | White | Cells 2 & 4 white wires joined |
@@ -109,7 +112,7 @@ Four **half-bridge** load cells are combined into a single **full Wheatstone bri
 ### HX711 to ESP32 Connection
 
 | HX711 Pin | ESP32 GPIO | Description |
-|-----------|---------------|-------------|
+| ----------- | --------------- | ------------- |
 | VCC | 3V3 | Supply voltage (3.3 V) |
 | GND | GND | Common ground |
 | DT / DOUT | GPIO 4 | Serial data output |
@@ -119,15 +122,16 @@ Four **half-bridge** load cells are combined into a single **full Wheatstone bri
 
 ### Schematic Overview
 
-```
+```text
  3.3V ──┬──────────────────────────────────────┐
-        │                                       │
-      HX711                               ESP32
+        │                                      │
+      HX711                                  ESP32
      ┌──────┐                            ┌──────────┐
-     │  VCC │◄──── 3.3V                  │          │
-     │  GND │──── GND ───────────────────│ GND      │
-     │  DT  │────────────────────────────│ GPIO 4   │
-     │  SCK │────────────────────────────│ GPIO 5   │
+     │  VDD │────────────────────────────│ 3V3      │
+     │  VCC │────────────────────────────│ VUSB     │
+     │  GND │────────────────────────────│ GND      │
+     │  DT  │────────────────────────────│ GPIO 16  │
+     │  SCK │────────────────────────────│ GPIO 17  │
      │  E+  │◄──── Bridge E+             │          │
      │  E-  │◄──── Bridge E−             └──────────┘
      │  A+  │◄──── Bridge A+
@@ -141,7 +145,7 @@ Four **half-bridge** load cells are combined into a single **full Wheatstone bri
 
 Once the ESP32 connects to Wi-Fi the serial monitor prints the dashboard URL:
 
-```
+```text
 I (3241) MAIN: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 I (3242) MAIN:   Dashboard: http://192.168.1.42/
 I (3243) MAIN: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -167,7 +171,7 @@ The entire dashboard is served as a single embedded HTML file from ESP32 flash �
 All endpoints return `application/json`.
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| -------- | ---------- | ------------- |
 | `GET` | `/` | Dashboard HTML page |
 | `GET` | `/api/weight` | `{"weight_g": 123.45, "unit": "g"}` |
 | `GET` | `/api/status` | System info: IP, uptime, scale factor, heap |
@@ -200,7 +204,7 @@ curl -N http://192.168.1.42/events
 
 ## Project Structure
 
-```
+```text
 esp32_scale/
 ├── CMakeLists.txt              # Top-level ESP-IDF project CMake
 ├── sdkconfig.defaults          # Pre-tuned SDK configuration
@@ -284,8 +288,8 @@ idf.py -p PORT monitor
 
 Look for the dashboard URL in the output:
 
-```
-I (3242) MAIN:   Dashboard: http://192.168.1.42/
+```text
+I (3242) MAIN:   Dashboard: http://192.168.0.47/
 ```
 
 Open that URL in your browser. Press `Ctrl+]` to exit the monitor.
@@ -306,11 +310,11 @@ Calibration maps raw counts to real-world grams using a **known reference weight
 
 ### Step-by-Step Calibration
 
-**Method 1 – UART Wizard (recommended for first-time setup)**
+**`Method 1 – UART Wizard (recommended for first-time setup)`**
 
 Connect a serial monitor (115200 baud) and send the `calibrate` command, or simply reboot with an empty scale. The wizard runs automatically if no calibration data is found in NVS:
 
-```
+```text
 ========================================
       Digital Scale Calibration Wizard
 ========================================
@@ -333,7 +337,7 @@ Connect a serial monitor (115200 baud) and send the `calibrate` command, or simp
 ========================================
 ```
 
-**Method 2 – HTTP API (for remote / automated calibration)**
+**`Method 2 – HTTP API (for remote / automated calibration)`**
 
 ```bash
 # Step 1 – Tare with nothing on the scale
@@ -347,7 +351,7 @@ curl -X POST http://192.168.1.42/api/calibrate \
      -d '{"scale": 431.0}'
 ```
 
-**Method 3 – Compile-time default**
+**`Method 3 – Compile-time default`**
 
 Edit `CONFIG_SCALE_FACTOR` in `main/scale_config.h` before flashing. This is used as the fallback when no NVS calibration data exists.
 
@@ -366,15 +370,15 @@ Edit `CONFIG_SCALE_FACTOR` in `main/scale_config.h` before flashing. This is use
 All options are in `main/scale_config.h`.
 
 | Constant | Default | Description |
-|----------|---------|-------------|
-| `CONFIG_HX711_DOUT_GPIO` | `4` | HX711 DOUT → ESP32 GPIO |
-| `CONFIG_HX711_SCK_GPIO` | `5` | HX711 SCK → ESP32 GPIO |
+| ---------- | --------- | ------------- |
+| `CONFIG_HX711_DOUT_GPIO` | `16` | HX711 DOUT → ESP32 GPIO |
+| `CONFIG_HX711_SCK_GPIO` | `17` | HX711 SCK → ESP32 GPIO |
 | `CONFIG_SCALE_SAMPLES` | `10` | ADC samples averaged per reading |
 | `CONFIG_MEASURE_INTERVAL_MS` | `500` | ms between measurements |
 | `CONFIG_TARE_SAMPLES` | `20` | Samples used for tare capture |
-| `CONFIG_SCALE_FACTOR` | `430.0` | Default raw counts per gram |
-| `CONFIG_MAX_WEIGHT_G` | `200000.0` | Full scale (4 × 50 000 g) |
-| `CONFIG_ZERO_THRESHOLD_G` | `2.0` | Dead-band around zero (grams) |
+| `CONFIG_SCALE_FACTOR` | `-10420.86` | Default raw counts per gram |
+| `CONFIG_MAX_WEIGHT_G` | `440.9245` | Full scale (4 × 50 000 g = 440 lb) |
+| `CONFIG_ZERO_THRESHOLD_G` | `2.0` | Dead-band around zero (pounds) |
 | `CONFIG_WIFI_SSID` | `"YOUR_WIFI_SSID"` | Network name |
 | `CONFIG_WIFI_PASSWORD` | `"YOUR_WIFI_PASSWORD"` | Network password |
 | `CONFIG_WIFI_MAX_RETRIES` | `5` | Reconnection attempts |
@@ -388,7 +392,7 @@ All options are in `main/scale_config.h`.
 
 ### Task Diagram
 
-```
+```text
 app_main()
   │
   ├─ nvs_flash_init()
@@ -414,7 +418,7 @@ app_main()
 
 ### Component Dependencies
 
-```
+```text
 main
  ├── hx711          (components/hx711)
  ├── calibration    (main/)
@@ -432,38 +436,45 @@ main
 
 ## Troubleshooting
 
-**Scale always reads 0 or a fixed value**
+**`Scale always reads 0 or a fixed value`**
+
 - Check DOUT and SCK wiring between the HX711 and ESP32.
 - Verify the HX711 VCC is at 3.3 V (not 5 V, which can damage GPIO inputs).
 - Ensure a common GND between the HX711 and the ESP32.
 - Confirm load cells are wired as a full bridge (E+/E−/A+/A−).
 
-**Readings are very noisy**
+**`Readings are very noisy`**
+
 - Increase `CONFIG_SCALE_SAMPLES` in `scale_config.h` (try 20–30).
 - Add 100 nF decoupling capacitors on the HX711 VCC pin.
 - Route signal wires away from power lines and the USB cable.
 - Check that the load cell frame is mechanically rigid.
 
-**Wi-Fi does not connect**
+**`Wi-Fi does not connect`**
+
 - Double-check `CONFIG_WIFI_SSID` and `CONFIG_WIFI_PASSWORD`.
 - The ESP32 supports 2.4 GHz only — ensure your router broadcasts on that band.
 - Increase `CONFIG_WIFI_MAX_RETRIES` if the environment is noisy.
 
-**Dashboard does not open**
+**`Dashboard does not open`**
+
 - Confirm the ESP32 and your computer are on the same Wi-Fi subnet.
 - Check the IP address printed in the serial monitor.
 - Try port 80 explicitly: `http://<IP>:80/`.
 - If port 80 is blocked, change `CONFIG_WEBSERVER_PORT` to 8080.
 
-**SSE chart does not update**
+**`SSE chart does not update`**
+
 - Modern browsers require a stable connection; reload the page once.
 - Check for firewall rules blocking persistent HTTP connections.
 
 **`calibration_load` returns `ESP_ERR_NVS_NOT_FOUND`**
+
 - This is normal on the first boot. Run the calibration wizard to set values.
 - The compile-time default `CONFIG_SCALE_FACTOR` is used until calibration runs.
 
 **Build error: `cJSON not found`**
+
 - Ensure `CONFIG_CJSON_ENABLE=y` is in `sdkconfig.defaults` (already set).
 - Run `idf.py reconfigure` to regenerate the sdkconfig.
 
