@@ -49,9 +49,6 @@ static IRAM_ATTR int hx711_clock_pulse(const hx711_dev_t *dev)
 
 /* ── Public API ───────────────────────────────────────────────────── */
 
-/**
- * @brief Initialise the HX711 and configure GPIO pins.
- */
 esp_err_t hx711_init(hx711_dev_t *dev, const hx711_config_t *cfg)
 {
     if (!dev || !cfg) {
@@ -89,27 +86,19 @@ esp_err_t hx711_init(hx711_dev_t *dev, const hx711_config_t *cfg)
         return err;
     }
 
-    ESP_LOGI(TAG, "Init OK – DOUT:GPIO%d  SCK:GPIO%d  gain:%d",
-             cfg->dout_pin, cfg->sck_pin, (int)cfg->gain);
+    ESP_LOGI(TAG, "Init OK - DOUT:GPIO%d  SCK:GPIO%d  gain:%d", cfg->dout_pin, cfg->sck_pin, (int)cfg->gain);
     return ESP_OK;
 }
 
-/**
- * @brief Check whether a conversion result is ready (DOUT == LOW).
- */
 esp_err_t hx711_is_ready(const hx711_dev_t *dev, bool *ready)
 {
     *ready = (gpio_get_level(dev->cfg.dout_pin) == 0);
     return ESP_OK;
 }
 
-/**
- * @brief Block until DOUT is LOW or the timeout elapses.
- */
 esp_err_t hx711_wait_ready(const hx711_dev_t *dev)
 {
-    const int64_t deadline = esp_timer_get_time()
-                             + (int64_t)HX711_READY_TIMEOUT_MS * 1000LL;
+    const int64_t deadline = esp_timer_get_time() + (int64_t)HX711_READY_TIMEOUT_MS * 1000LL;
 
     while (esp_timer_get_time() < deadline) {
         bool ready = false;
@@ -122,9 +111,6 @@ esp_err_t hx711_wait_ready(const hx711_dev_t *dev)
     return ESP_ERR_TIMEOUT;
 }
 
-/**
- * @brief Read one raw 24-bit two's-complement sample.
- */
 esp_err_t hx711_read_raw(hx711_dev_t *dev, int32_t *raw)
 {
     esp_err_t err = hx711_wait_ready(dev);
@@ -156,9 +142,6 @@ esp_err_t hx711_read_raw(hx711_dev_t *dev, int32_t *raw)
     return ESP_OK;
 }
 
-/**
- * @brief Average multiple raw readings.
- */
 esp_err_t hx711_read_average(hx711_dev_t *dev, uint8_t samples, int32_t *avg)
 {
     if (samples == 0 || samples > HX711_MAX_SAMPLES) return ESP_ERR_INVALID_ARG;
@@ -184,9 +167,6 @@ esp_err_t hx711_read_average(hx711_dev_t *dev, uint8_t samples, int32_t *avg)
     return ESP_OK;
 }
 
-/**
- * @brief Capture the zero-weight tare offset.
- */
 esp_err_t hx711_tare(hx711_dev_t *dev, uint8_t samples)
 {
     int32_t avg = 0;
@@ -198,9 +178,6 @@ esp_err_t hx711_tare(hx711_dev_t *dev, uint8_t samples)
     return err;
 }
 
-/**
- * @brief Set the calibration scale factor.
- */
 esp_err_t hx711_set_scale(hx711_dev_t *dev, float scale)
 {
     if (scale == 0.0f) return ESP_ERR_INVALID_ARG;
@@ -209,18 +186,12 @@ esp_err_t hx711_set_scale(hx711_dev_t *dev, float scale)
     return ESP_OK;
 }
 
-/**
- * @brief Retrieve the currently active scale factor.
- */
 esp_err_t hx711_get_scale(const hx711_dev_t *dev, float *scale)
 {
     *scale = dev->scale;
     return ESP_OK;
 }
 
-/**
- * @brief Read calibrated weight in grams.
- */
 esp_err_t hx711_get_weight(hx711_dev_t *dev, uint8_t samples, float *pounds)
 {
     int32_t avg = 0;
@@ -229,14 +200,10 @@ esp_err_t hx711_get_weight(hx711_dev_t *dev, uint8_t samples, float *pounds)
 
     /* Calculate pounds: scale is counts per pound */
     *pounds = (float)(avg - dev->tare) / dev->scale;
-    ESP_LOGD(TAG, "weight=%.2f lb (avg=%" PRId32 " tare=%" PRId32 " scale=%.4f)",
-             *pounds, avg, dev->tare, dev->scale);
+    ESP_LOGD(TAG, "weight=%.2f lb (avg=%" PRId32 " tare=%" PRId32 " scale=%.4f)", *pounds, avg, dev->tare, dev->scale);
     return ESP_OK;
 }
 
-/**
- * @brief Put the HX711 into power-down mode (SCK held HIGH > 60 µs).
- */
 esp_err_t hx711_power_down(hx711_dev_t *dev)
 {
     gpio_set_level(dev->cfg.sck_pin, 0);
@@ -246,9 +213,6 @@ esp_err_t hx711_power_down(hx711_dev_t *dev)
     return ESP_OK;
 }
 
-/**
- * @brief Wake the HX711 from power-down by pulling SCK LOW.
- */
 esp_err_t hx711_power_up(hx711_dev_t *dev)
 {
     gpio_set_level(dev->cfg.sck_pin, 0);
@@ -256,9 +220,6 @@ esp_err_t hx711_power_up(hx711_dev_t *dev)
     return ESP_OK;
 }
 
-/**
- * @brief Reset software state without touching GPIO.
- */
 esp_err_t hx711_reset(hx711_dev_t *dev)
 {
     dev->tare  = 0;
