@@ -113,10 +113,12 @@ Four **half-bridge** load cells are combined into a single **full Wheatstone bri
 
 | HX711 Pin | ESP32 GPIO | Description |
 | ----------- | --------------- | ------------- |
-| VCC | 3V3 | Supply voltage (3.3 V) |
+| VDD | 3V3 | Logic voltage (3.3 V) |
+| VCC | 5V | Supply Voltage |
 | GND | GND | Common ground |
-| DT / DOUT | GPIO 4 | Serial data output |
-| SCK / PD_SCK | GPIO 5 | Serial clock / power-down |
+| DT / DOUT | GPIO 16 | Serial data output |
+| SCK / PD_SCK | GPIO 17 | Serial clock / power-down |
+| SCK / PD_SCK | GPIO 17 | Serial clock / power-down |
 
 > GPIO assignments can be changed in `main/scale_config.h` (`CONFIG_HX711_DOUT_GPIO` and `CONFIG_HX711_SCK_GPIO`).
 
@@ -173,31 +175,31 @@ All endpoints return `application/json`.
 | Method | Endpoint | Description |
 | -------- | ---------- | ------------- |
 | `GET` | `/` | Dashboard HTML page |
-| `GET` | `/api/weight` | `{"weight_g": 123.45, "unit": "g"}` |
+| `GET` | `/api/weight` | `{"weight_lb": 12.34, "unit": "lb"}` |
 | `GET` | `/api/status` | System info: IP, uptime, scale factor, heap |
 | `POST` | `/api/tare` | Tare the scale; returns `{"status": "ok"}` |
-| `POST` | `/api/calibrate` | Body: `{"scale": 430.0}`; applies new factor |
+| `POST` | `/api/calibrate` | Body: `{"scale": -10420.86}`; applies new factor |
 | `GET` | `/events` | SSE stream — `event: weight` every 500 ms |
 
 ### Example curl commands
 
 ```bash
 # Read current weight
-curl http://192.168.1.42/api/weight
+curl http://192.168.0.47/api/weight
 
 # Tare
-curl -X POST http://192.168.1.42/api/tare
+curl -X POST http://192.168.0.47/api/tare
 
 # Set calibration scale factor
-curl -X POST http://192.168.1.42/api/calibrate \
+curl -X POST http://192.168.0.47/api/calibrate \
      -H "Content-Type: application/json" \
-     -d '{"scale": 435.7}'
+     -d '{"scale": -10420.86}'
 
 # System status
-curl http://192.168.1.42/api/status
+curl http://192.168.0.47/api/status
 
 # SSE stream (Ctrl+C to stop)
-curl -N http://192.168.1.42/events
+curl -N http://192.168.0.47/events
 ```
 
 ---
@@ -262,9 +264,12 @@ cd esp32-digital-scale
 #      #define CONFIG_WIFI_PASSWORD  "YOUR_WIFI_PASSWORD"
 nano main/scale_config.h
 
-# 3. (Optional) Change GPIO pins if your board layout differs
-#      #define CONFIG_HX711_DOUT_GPIO  4
-#      #define CONFIG_HX711_SCK_GPIO   5
+# 3. (Optional) Set Calibration factor if you have it
+#      #define CONFIG_SCALE_FACTOR -10420.86f
+
+# 4. (Optional) Change GPIO pins if your board layout differs
+#      #define CONFIG_HX711_DOUT_GPIO  16
+#      #define CONFIG_HX711_SCK_GPIO   17
 ```
 
 ### Build & Flash
@@ -276,7 +281,7 @@ idf.py set-target esp32
 # Build
 idf.py build
 
-# Flash (replace PORT with your serial port, e.g. /dev/ttyUSB0 or COM3)
+# Flash (replace PORT with your serial port, e.g. /dev/ttyUSB0 or COM4)
 idf.py -p PORT flash
 ```
 
@@ -300,13 +305,13 @@ Open that URL in your browser. Press `Ctrl+]` to exit the monitor.
 
 ### Why Calibration Is Needed
 
-The HX711 outputs a raw integer count that is proportional to the mechanical strain on the load cells. The exact conversion factor (counts per gram) depends on:
+The HX711 outputs a raw integer count that is proportional to the mechanical strain on the load cells. The exact conversion factor (counts per pound) depends on:
 
 - The mechanical properties of your load cell frame.
 - The gain setting of the HX711 (default: Channel A, gain 128).
 - Supply voltage variations.
 
-Calibration maps raw counts to real-world grams using a **known reference weight**.
+Calibration maps raw counts to real-world pounds using a **known reference weight**.
 
 ### Step-by-Step Calibration
 
@@ -324,8 +329,8 @@ Connect a serial monitor (115200 baud) and send the `calibrate` command, or simp
       Capturing tare (20 samples)...
       Tare captured: -47382 raw counts
 
-[2/3] Enter the reference weight in grams (e.g. 1000): 1000
-      Place the 1000.0 g reference weight on the platform.
+[2/3] Enter the reference weight in pounds (e.g. 19.2): 19.2
+      Place the 19.2 lb reference weight on the platform.
       Press ENTER when ready...
       Measuring (20 samples)...
       Loaded avg : 383618 raw counts
@@ -341,14 +346,14 @@ Connect a serial monitor (115200 baud) and send the `calibrate` command, or simp
 
 ```bash
 # Step 1 – Tare with nothing on the scale
-curl -X POST http://192.168.1.42/api/tare
+curl -X POST http://192.168.0.47/api/tare
 
 # Step 2 – Place known weight, compute factor manually:
 #   factor = (raw_loaded - raw_tare) / known_grams
 #   Then apply:
-curl -X POST http://192.168.1.42/api/calibrate \
+curl -X POST http://192.168.0.47/api/calibrate \
      -H "Content-Type: application/json" \
-     -d '{"scale": 431.0}'
+     -d '{"scale": -10420.86}'
 ```
 
 **`Method 3 – Compile-time default`**
