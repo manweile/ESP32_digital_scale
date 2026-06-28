@@ -20,18 +20,20 @@
  * @date    2025
  */
 
-#include <stdio.h>
+// Standard library headers
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
 #include <math.h>
+#include "nvs_flash.h"
+#include <stdio.h>
 
-#include "scale_config.h"
-#include "hx711.h"
+// Local project headers
 #include "calibration.h"
-#include "wifi_manager.h"
+#include "hx711.h"
+#include "scale_config.h"
 #include "web_server.h"
+#include "wifi_manager.h"
 
 static const char *TAG = "MAIN";
 
@@ -102,7 +104,7 @@ void app_main(void)
     /* ── 1. NVS ── */
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_LOGW(TAG, "NVS partition was truncated/upgraded – erasing");
+        ESP_LOGW(TAG, "NVS partition was truncated/upgraded - erasing");
         nvs_flash_erase();
         err = nvs_flash_init();
     }
@@ -115,7 +117,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Wi-Fi connection failed. Dashboard will not be available.");
         /* Continue without Wi-Fi so the scale still works locally */
     } else {
-        ESP_LOGI(TAG, "Wi-Fi OK – IP: %s", wifi_manager_get_ip());
+        ESP_LOGI(TAG, "Wi-Fi OK - IP: %s", wifi_manager_get_ip());
     }
 
     /* ── 3. HX711 ── */
@@ -129,21 +131,21 @@ void app_main(void)
     /* Load calibration from NVS, fall back to compile-time defaults */
     err = calibration_load(&s_hx711);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "No saved calibration – applying compile-time defaults");
+        ESP_LOGW(TAG, "No saved calibration - applying compile-time defaults");
         hx711_set_scale(&s_hx711, CONFIG_SCALE_FACTOR);
     }
 
     /* ── 4. Initial tare ── */
-    ESP_LOGI(TAG, "Performing initial tare (%d samples)…", CONFIG_TARE_SAMPLES);
+    ESP_LOGI(TAG, "Performing initial tare (%d samples)...", CONFIG_TARE_SAMPLES);
     vTaskDelay(pdMS_TO_TICKS(500)); /* let HX711 settle */
     ESP_ERROR_CHECK(hx711_tare(&s_hx711, CONFIG_TARE_SAMPLES));
 
     /* ── 5. Web server ── */
     if (wifi_manager_is_connected()) {
         ESP_ERROR_CHECK(web_server_start(&s_hx711));
-        ESP_LOGI(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        ESP_LOGI(TAG, "-----------------------------------------");
         ESP_LOGI(TAG, "  Dashboard: http://%s/", wifi_manager_get_ip());
-        ESP_LOGI(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        ESP_LOGI(TAG, "-----------------------------------------");
     }
 
     /* ── 6. Measurement task ── */

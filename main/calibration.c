@@ -10,16 +10,18 @@
  * @date    2025
  */
 
-#include "calibration.h"
-#include "scale_config.h"
-
+ // Standard library headers
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
 #include "nvs.h"
+#include "nvs_flash.h"
+
+ // Local project headers
+#include "calibration.h"
+#include "scale_config.h"
 
 static const char *TAG = "CALIBRATION";
 

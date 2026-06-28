@@ -17,6 +17,17 @@
         ]
       }
     },
-    "terminal.integrated.defaultProfile.windows": "ESP-IDF PowerShell"
+    "terminal.integrated.defaultProfile.windows": "ESP-IDF PowerShell",
+    "files.associations": {
+      "*.ino": "cpp",
+      "nvs_flash.h": "c",
+      "freertos.h": "c",
+      "stdio.h": "c",
+      "task.h": "c",
+      "esp_log.h": "c",
+      "math.h": "c",
+      "esp_err.h": "c",
+      "hx711.h": "c"
+    }
   }
 }

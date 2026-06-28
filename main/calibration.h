@@ -17,7 +17,10 @@
 #ifndef CALIBRATION_H
 #define CALIBRATION_H
 
+// Standard library headers
 #include "esp_err.h"
+
+// Local project headers
 #include "hx711.h"
 
 #ifdef __cplusplus
