@@ -165,20 +165,10 @@ static const char DASHBOARD_HTML[] =
 "<div class=\"card-title\">Controls</div>"
 "<div class=\"btn-row\">"
 "<button class=\"btn btn-accent\" onclick=\"doTare()\">&#9654; Tare (Zero)</button>"
-"<button class=\"btn btn-outline\" onclick=\"resetStats()\">Reset Stats</button>"
 "</div>"
 "<div class=\"notice\" id=\"tare-status\">Place nothing on the scale before taring.</div>"
 "</div>"
-
-/* ── Stats card ── */
-"<div class=\"card\">"
-"<div class=\"card-title\">Session Statistics</div>"
-"<div class=\"stats\">"
-"<div class=\"stat\"><div class=\"stat-val\" id=\"stat-min\">--</div><div class=\"stat-lbl\">Min</div></div>"
-"<div class=\"stat\"><div class=\"stat-val\" id=\"stat-max\">--</div><div class=\"stat-lbl\">Max</div></div>"
-"<div class=\"stat\"><div class=\"stat-val\" id=\"stat-avg\">--</div><div class=\"stat-lbl\">Avg</div></div>"
-"</div>"
-"</div>"
+""
 
 /* ── Calibration card ── */
 "<div class=\"card\">"
@@ -223,16 +213,12 @@ static const char DASHBOARD_HTML[] =
 "return lb.toFixed(2);"
 "}"
 
-"/* -- Stats -- */"
-"function updateStats(){"
-"document.getElementById('stat-min').textContent=minW===Infinity?'--':toUnit(minW)+' lb';"
-"document.getElementById('stat-max').textContent=maxW===-Infinity?'--':toUnit(maxW)+' lb';"
-"document.getElementById('stat-avg').textContent=countW===0?'--':(toUnit(sumW/countW))+' lb';"
-"}"
+"/* -- Stats (removed UI) -- */"
+"function updateStats(){ /* no-op: session statistics UI removed */ }"
 "function resetStats(){"
-"minW=Infinity;maxW=-Infinity;sumW=0;countW=0;history.length=0;"
-"updateStats();chart.data.labels=[];chart.data.datasets[0].data=[];chart.update();"
-"toast('Stats reset');"
+"  minW=Infinity;maxW=-Infinity;sumW=0;countW=0;history.length=0;"
+"  chart.data.labels=[];chart.data.datasets[0].data=[];chart.update();"
+"  toast('Stats reset');"
 "}"
 
 "/* -- Weight update -- */"
