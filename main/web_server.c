@@ -84,12 +84,14 @@ static const char DASHBOARD_HTML[] =
 "border-radius:var(--radius);padding:1.4rem;box-shadow:var(--shadow)}"
 ".card-title{font-size:.75rem;font-weight:600;text-transform:uppercase;"
 "letter-spacing:.1em;color:var(--muted);margin-bottom:.8rem}"
+
 /* Weight display */
 "#weight-display{font-size:4.5rem;font-weight:800;line-height:1;"
 "letter-spacing:-.02em;color:var(--text);text-align:center;"
 "transition:color .3s}"
 "#weight-unit{font-size:1.4rem;font-weight:400;color:var(--muted);margin-left:.3rem}"
 "#weight-card{text-align:center}"
+
 /* Status dot */
 ".status-row{display:flex;align-items:center;gap:.5rem;margin-top:.8rem;"
 "justify-content:center}"
@@ -97,6 +99,7 @@ static const char DASHBOARD_HTML[] =
 "transition:background .4s}"
 ".dot.online{background:var(--green);box-shadow:0 0 8px var(--green)}"
 ".status-label{font-size:.8rem;color:var(--muted)}"
+
 /* Buttons */
 ".btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;"
 "padding:.55rem 1.1rem;border-radius:.6rem;border:none;cursor:pointer;"
@@ -106,26 +109,31 @@ static const char DASHBOARD_HTML[] =
 ".btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}"
 ".btn-danger{background:var(--red);color:#fff}"
 ".btn-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}"
+
 /* Unit toggle */
 ".unit-toggle{display:flex;gap:.4rem;justify-content:center;margin-top:.8rem}"
 ".unit-btn{padding:.35rem .9rem;border-radius:.5rem;border:1px solid var(--border);"
 "background:transparent;color:var(--muted);cursor:pointer;font-size:.8rem;font-weight:600;"
 "transition:all .2s}"
 ".unit-btn.active{background:var(--accent2);color:#fff;border-color:var(--accent2)}"
+
 /* Chart */
 "#history-card{grid-column:1/-1}"
 "canvas{max-height:220px}"
+
 /* Stats row */
 ".stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.4rem}"
 ".stat{background:var(--surface2);border-radius:.6rem;padding:.7rem;text-align:center}"
 ".stat-val{font-size:1.2rem;font-weight:700;color:var(--accent)}"
 ".stat-lbl{font-size:.7rem;color:var(--muted);margin-top:.2rem}"
+
 /* Calibration */
 "input[type=number]{background:var(--surface2);border:1px solid var(--border);"
 "border-radius:.5rem;color:var(--text);padding:.45rem .7rem;font-size:.9rem;width:100%;"
 "margin-bottom:.6rem}"
 "input[type=number]:focus{outline:2px solid var(--accent);border-color:transparent}"
 ".notice{font-size:.75rem;color:var(--muted);margin-top:.4rem;line-height:1.5}"
+
 /* Toast */
 "#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--surface);"
 "border:1px solid var(--border);border-radius:.7rem;padding:.7rem 1.1rem;"
@@ -149,16 +157,7 @@ static const char DASHBOARD_HTML[] =
 /* ── Weight card ── */
 "<div class=\"card\" id=\"weight-card\">"
 "<div class=\"card-title\">Current Weight</div>"
-"<div id=\"weight-display\"><span id=\"weight-value\">---</span><span id=\"weight-unit\"> lb</span></div>"
-"<div class=\"unit-toggle\">"
-"<button class=\"unit-btn\" onclick=\"setUnit('g')\">g</button>"
-"<button class=\"unit-btn\" onclick=\"setUnit('kg')\">kg</button>"
-"<button class=\"unit-btn active\" onclick=\"setUnit('lb')\">lb</button>"
-"</div>"
-"<div class=\"status-row\">"
-"<div class=\"dot\" id=\"dot\"></div>"
-"<span class=\"status-label\" id=\"status-label\">Connecting...</span>"
-"</div>"
+"<div id=\"weight-display\"><span id=\"weight-value\">---</span></div>"
 "</div>"
 
 /* ── Controls card ── */
@@ -197,6 +196,10 @@ static const char DASHBOARD_HTML[] =
 "<div class=\"card\">"
 "<div class=\"card-title\">System Info</div>"
 "<div id=\"sys-info\" style=\"font-size:.8rem;color:var(--muted);line-height:2\">Loading...</div>"
+"<div class=\"status-row\">"
+"<div class=\"dot\" id=\"dot\"></div>"
+"<span class=\"status-label\" id=\"status-label\">Connecting...</span>"
+"</div>"
 "</div>"
 
 /* ── History chart ── */
@@ -211,7 +214,7 @@ static const char DASHBOARD_HTML[] =
 
 "<script>"
 "/* -- State -- */"
-"let unit='lb',minW=Infinity,maxW=-Infinity,sumW=0,countW=0;"
+"let minW=Infinity,maxW=-Infinity,sumW=0,countW=0;"
 "const history=[];"
 "const MAX_HIST=120;" /* 60s @ 500ms */
 
@@ -219,18 +222,12 @@ static const char DASHBOARD_HTML[] =
 "function toUnit(lb){"
 "return lb.toFixed(2);"
 "}"
-"function setUnit(u){"
-"unit=u;"
-"document.querySelectorAll('.unit-btn').forEach(b=>b.classList.toggle('active',b.textContent===u));"
-"document.getElementById('weight-unit').textContent=' '+u;"
-"updateStats();"
-"}"
 
 "/* -- Stats -- */"
 "function updateStats(){"
-"document.getElementById('stat-min').textContent=minW===Infinity?'--':toUnit(minW)+' '+unit;"
-"document.getElementById('stat-max').textContent=maxW===-Infinity?'--':toUnit(maxW)+' '+unit;"
-"document.getElementById('stat-avg').textContent=countW===0?'--':(toUnit(sumW/countW))+' '+unit;"
+"document.getElementById('stat-min').textContent=minW===Infinity?'--':toUnit(minW)+' lb';"
+"document.getElementById('stat-max').textContent=maxW===-Infinity?'--':toUnit(maxW)+' lb';"
+"document.getElementById('stat-avg').textContent=countW===0?'--':(toUnit(sumW/countW))+' lb';"
 "}"
 "function resetStats(){"
 "minW=Infinity;maxW=-Infinity;sumW=0;countW=0;history.length=0;"
@@ -241,10 +238,8 @@ static const char DASHBOARD_HTML[] =
 "/* -- Weight update -- */"
 "function updateWeight(lb){"
 "  const val_el=document.getElementById('weight-value');"
-"  const unit_el=document.getElementById('weight-unit');"
-"  if(!val_el || !unit_el) return; /* defensive: avoid exceptions if DOM missing */"
-"  val_el.textContent=toUnit(lb);"
-"  unit_el.textContent=' '+unit;"
+"  if(!val_el) return; /* defensive: avoid exceptions if DOM missing */"
+"  val_el.textContent=toUnit(lb) + ' lb';"
 "  val_el.style.color=Math.abs(lb)<2?'var(--muted)':'var(--text)';"
 "  /* stats */"
 "  if(lb<minW)minW=lb;"
