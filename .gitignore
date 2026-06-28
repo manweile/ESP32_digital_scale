@@ -29,7 +29,7 @@ Thumbs.db
 # Edit scale_config.h locally; do not push your Wi-Fi password
 
 # Logs
-logs/Scale.txt
+logs/
 
 # Local logs
 logs/Scale.txt
