@@ -63,22 +63,22 @@ Key specifications:
 ## Internal Block Diagram
 
 ```text
-                       ┌───────────────────────────────────┐
+                       ┌────────────────────────────────────┐
                        │             HX711                  │
-  E+ ─────────────────►│ REG ─► AVDD                       │
+  E+ ─────────────────►│ REG ─► AVDD                        │
   E- ─────────────────►│              ▼                     │
                        │         Bias / Ref                 │
   A+ ─────────────────►│─┐                                  │
-  A- ─────────────────►│─┤► MUX ─► PGA (×64/×128) ─► ADC ─►│ DOUT
-                       │  │                         24-bit  │
-  B+ ─────────────────►│─┘         (×32 for B)             │
+  A- ─────────────────►│─┤► MUX ─► PGA (×64/×128) ─► ADC ─► │ DOUT
+                       │ │                         24-bit   │
+  B+ ─────────────────►│─┘         (×32 for B)              │
   B- ─────────────────►│                                    │
                        │    Internal oscillator             │
                        │    10 Hz / 80 Hz selector          │◄── RATE
                        │                                    │◄── PD_SCK
   VDD ────────────────►│ Digital supply (DVDD)              │
   GND ────────────────►│ GND                                │
-                       └───────────────────────────────────┘
+                       └────────────────────────────────────┘
 ```
 
 The on-chip **programmable gain amplifier (PGA)** amplifies the tiny differential signal from the bridge (typically 0 – 20 mV full scale) before it reaches the ADC. A higher gain improves resolution at the cost of a smaller maximum input range.
@@ -132,7 +132,7 @@ The four 50 kg half-bridge cells used in this project are wired to form a **sing
 | A+ | White wires of Cells 2 & 4 (tied together) |
 | A− | Green/Yellow wires of Cells 2 & 4 (tied together) |
 
-With this arrangement the four cells share the mechanical load and their signals add constructively, giving a combined full-scale capacity of **200 kg** (4 × 50 kg).
+With this arrangement the four cells share the mechanical load and their signals add constructively, giving a combined full-scale capacity of **200 kg / 440 lbs** (4 × 50 kg).
 
 > **Important:** The physical placement of the cells in the scale frame matters. Cells 1 and 3 must be on one diagonal of the platform, and Cells 2 and 4 on the other. This ensures tensile and compressive forces cancel correctly.
 
@@ -140,22 +140,24 @@ With this arrangement the four cells share the mechanical load and their signals
 
 ## HX711 Pin Description
 
-| Pin | Name | Direction | Description |
-| ----- | ------ | ----------- | ------------- |
-| 1 | VSUP | Power | Analog supply (2.6 – 5.5 V) |
-| 2 | BASE | Output | Internal bias (connect 100 nF to GND) |
-| 3 | AGND | Power | Analog ground |
-| 4 | VFB | Input | Voltage regulator feedback |
-| 5 | AVDD | Output | Regulated analog supply for bridge excitation |
-| 6 | VBG | Output | Band-gap reference output |
-| 7 | INA− | Input | Channel A differential input − |
-| 8 | INA+ | Input | Channel A differential input + |
-| 9 | INB− | Input | Channel B differential input − |
-| 10 | INB+ | Input | Channel B differential input + |
-| 11 | PD_SCK | Input | Power-down control & serial clock |
-| 12 | DOUT | Output | Serial data output |
-| 13 | RATE | Input | Output data rate: LOW = 10 Hz, HIGH = 80 Hz |
-| 14 | DVDD | Power | Digital supply (2.6 – 5.5 V) |
+| Pin | Name | Function | Description | Notes |
+| ----- | ------ | ----------- | ------------- | ---------- |
+| 1 | VSUP | Power | Regulator supply: 2.7 ~ 5.5V | Main supply voltage (5V) |
+| 2 | BASE | Analog Output | Regulator control output | NC when not used |
+| 3 | AVDD | Power | Analog supply: 2.6 ~ 5.5V | Power to load cells |
+| 4 | VFB | Analog Input | Regulator control input | Connect to AGND when not used |
+| 5 | AGND | Ground | Analog ground | |
+| 6 | VBG | Analog Output | Reference bypass output | |
+| 7 | INA− | Analog Input | Channel A negative input | |
+| 8 | INA+ | Analog Input | Channel A positive input | |
+| 9 | INB− | Analog Input | Channel B negative input | |
+| 10 | INB+ | Analog Input | Channel B positive input | |
+| 11 | PD_SCK | Digital Input | Power-down control and serial clock input | Power down when high active |
+| 12 | DOUT | Digital Output | Serial data output | |
+| 13 | XO | Digital I/O | Crystal I/O | NC when not used |
+| 14 | XI | Digital Input | Crystal I/O or external clock input | 0: use on-chip oscillator |
+| 15 | RATE | Digital Input | Output data rate control | 0: 10Hz; 1: 80Hz |
+| 16 | DVDD | Power | Digital supply: 2.6 ~ 5.5V | Must be same voltage as MCU logic (3.3V) |
 
 > On the common **HX711 breakout module** many of these pins are internally wired. You only need to connect: VCC, GND, E+, E−, A+, A−, DOUT (DT), and SCK (PD_SCK).
 
@@ -163,10 +165,9 @@ With this arrangement the four cells share the mechanical load and their signals
 
 ## Power Supply Considerations
 
-- The HX711 can run from 3.3 V or 5 V; **this project uses 3.3 V** to be compatible with the ESP32's GPIO voltage.
+- The HX711 can run from 3.3 V and/or 5 V; **this project uses 3.3V for logic (DVDD)** to be compatible with the ESP32's GPIO voltage.
 - Keep power and signal traces separate on the PCB/breadboard.
-- Place a **100 nF ceramic decoupling capacitor** close to VCC.
-- The **AVDD output pin** (excitation voltage for the bridge) follows the supply voltage, so at 3.3 V the bridge is excited with ~3.3 V.
+- The **AVDD output pin** (excitation voltage for the bridge) follows the supply voltage, so at 5V the bridge is excited with ~4.3V.
 
 ---
 
@@ -207,14 +208,14 @@ The HX711 uses a **custom 2-wire synchronous serial protocol** driven entirely b
 ### Timing Diagram
 
 ```text
-DOUT  ─────┐                                                              ┌─────
+DOUT  ─────┐                                                            ┌─────
            │   Conversion    │<──────────── 24 data bits ──────────────>│
            └─────────────────┘
                (DOUT LOW                                                  (DOUT HIGH
                 = ready)                                                   after 24+N pulses)
 
 SCK   ──────────────────────┐ ┐ ┐ ┐ ┐ ┐ ... ┐ ┐ ┐ ┐ (gain pulses) ┐ ┐ ┐
-                             └ └ └ └ └ └     └ └ └ └               └ └ └
+                            └ └ └ └ └ └     └ └ └ └               └ └ └
                             │ Bit 23 (MSB)           Bit 0 (LSB) │
 
 T1 (SCK HIGH width) ≥ 0.2 µs
@@ -313,13 +314,13 @@ Captured with a known reference weight W_ref on the platform:
 ```text
 raw_loaded = average_raw_counts_with_W_ref
 delta      = raw_loaded - tare
-scale      = delta / W_ref      [units: counts per gram]
+scale      = delta / W_ref      [units: counts per lb]
 ```
 
 ### Weight Calculation
 
 ```text
-weight_g = (raw_reading - tare) / scale
+weight_lb = (raw_reading - tare) / scale
 ```
 
 **Worked example:**
