@@ -27,3 +27,9 @@ Thumbs.db
 
 # Secrets – never commit real credentials
 # Edit scale_config.h locally; do not push your Wi-Fi password
+
+# Logs
+logs/Scale.txt
+
+# Local logs
+logs/Scale.txt
