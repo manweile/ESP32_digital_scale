@@ -26,7 +26,7 @@
 /* ── Measurement ──────────────────────────────────────────────────── */
 
 /** ADC samples averaged per weight reading (higher = less noise, more latency). */
-#define CONFIG_SCALE_SAMPLES          10
+#define CONFIG_SCALE_SAMPLES          25
 
 /** Interval in ms between consecutive weight readings. */
 #define CONFIG_MEASURE_INTERVAL_MS    500
@@ -52,7 +52,7 @@
 #define CONFIG_WIFI_PASSWORD          "buddie22"
 
 /** Maximum Wi-Fi connection attempts before giving up. */
-#define CONFIG_WIFI_MAX_RETRIES       5
+#define CONFIG_WIFI_MAX_RETRIES       10
 
 /* ── Web Server ───────────────────────────────────────────────────── */
 
