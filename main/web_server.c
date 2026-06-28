@@ -509,7 +509,7 @@ static esp_err_t handler_api_calibrate(httpd_req_t *req)
     }
 
     cJSON *scale_item = cJSON_GetObjectItem(json, "scale");
-    if (!cJSON_IsNumber(scale_item) || scale_item->valuedouble <= 0.0) {
+    if (!cJSON_IsNumber(scale_item)) {
         cJSON_Delete(json);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing/invalid 'scale'");
         return ESP_FAIL;
