@@ -148,7 +148,7 @@ static const char DASHBOARD_HTML[] =
 /* ── Weight card ── */
 "<div class=\"card\" id=\"weight-card\">"
 "<div class=\"card-title\">Current Weight</div>"
-"<div id=\"weight-display\">---<span id=\"weight-unit\"> lb</span></div>"
+"<div id=\"weight-display\"><span id=\"weight-value\">---</span><span id=\"weight-unit\"> lb</span></div>"
 "<div class=\"unit-toggle\">"
 "<button class=\"unit-btn\" onclick=\"setUnit('g')\">g</button>"
 "<button class=\"unit-btn\" onclick=\"setUnit('kg')\">kg</button>"
@@ -156,7 +156,7 @@ static const char DASHBOARD_HTML[] =
 "</div>"
 "<div class=\"status-row\">"
 "<div class=\"dot\" id=\"dot\"></div>"
-"<span class=\"status-label\" id=\"status-label\">Connecting…</span>"
+"<span class=\"status-label\" id=\"status-label\">Connecting...</span>"
 "</div>"
 "</div>"
 
@@ -195,7 +195,7 @@ static const char DASHBOARD_HTML[] =
 /* ── System card ── */
 "<div class=\"card\">"
 "<div class=\"card-title\">System Info</div>"
-"<div id=\"sys-info\" style=\"font-size:.8rem;color:var(--muted);line-height:2\">Loading…</div>"
+"<div id=\"sys-info\" style=\"font-size:.8rem;color:var(--muted);line-height:2\">Loading...</div>"
 "</div>"
 
 /* ── History chart ── */
@@ -209,12 +209,12 @@ static const char DASHBOARD_HTML[] =
 "<div id=\"toast\"></div>"
 
 "<script>"
-"/* ── State ── */"
+"/* -- State -- */"
 "let unit='lb',minW=Infinity,maxW=-Infinity,sumW=0,countW=0;"
 "const history=[];"
 "const MAX_HIST=120;" /* 60s @ 500ms */
 
-"/* ── Unit conversion ── */"
+"/* -- Unit conversion -- */"
 "function toUnit(g){"
 "if(unit==='kg')return(g/1000).toFixed(3);"
 "if(unit==='lb')return(g/453.592).toFixed(3);"
@@ -227,7 +227,7 @@ static const char DASHBOARD_HTML[] =
 "updateStats();"
 "}"
 
-"/* ── Stats ── */"
+"/* -- Stats -- */"
 "function updateStats(){"
 "document.getElementById('stat-min').textContent=minW===Infinity?'--':toUnit(minW)+' '+unit;"
 "document.getElementById('stat-max').textContent=maxW===-Infinity?'--':toUnit(maxW)+' '+unit;"
@@ -239,55 +239,63 @@ static const char DASHBOARD_HTML[] =
 "toast('Stats reset');"
 "}"
 
-"/* ── Weight update ── */"
+"/* -- Weight update -- */"
 "function updateWeight(g){"
-"const el=document.getElementById('weight-display');"
-"const unit_el=document.getElementById('weight-unit');"
-"el.textContent=toUnit(g);"
-"unit_el.textContent=' '+unit;"
-"el.style.color=Math.abs(g)<2?'var(--muted)':'var(--text)';"
-"/* stats */"
-"if(g<minW)minW=g;"
-"if(g>maxW)maxW=g;"
-"sumW+=g;countW++;"
-"updateStats();"
-"/* chart */"
-"const now=new Date();"
-"const label=now.getHours().toString().padStart(2,'0')+':'"
-"+now.getMinutes().toString().padStart(2,'0')+':'"
-"+now.getSeconds().toString().padStart(2,'0');"
-"history.push({t:label,v:g});"
-"if(history.length>MAX_HIST)history.shift();"
-"chart.data.labels=history.map(h=>h.t);"
-"chart.data.datasets[0].data=history.map(h=>h.v);"
-"chart.update('none');"
+"  const val_el=document.getElementById('weight-value');"
+"  const unit_el=document.getElementById('weight-unit');"
+"  if(!val_el || !unit_el) return; /* defensive: avoid exceptions if DOM missing */"
+"  val_el.textContent=toUnit(g);"
+"  unit_el.textContent=' '+unit;"
+"  val_el.style.color=Math.abs(g)<2?'var(--muted)':'var(--text)';"
+"  /* stats */"
+"  if(g<minW)minW=g;"
+"  if(g>maxW)maxW=g;"
+"  sumW+=g;countW++;"
+"  updateStats();"
+"  /* chart */"
+"  const now=new Date();"
+"  const label=now.getHours().toString().padStart(2,'0')+':'"
+"    +now.getMinutes().toString().padStart(2,'0')+':'"
+"    +now.getSeconds().toString().padStart(2,'0');"
+"  history.push({t:label,v:g});"
+"  if(history.length>MAX_HIST)history.shift();"
+"  chart.data.labels=history.map(h=>h.t);"
+"  chart.data.datasets[0].data=history.map(h=>h.v);"
+"  chart.update('none');"
 "}"
 
-"/* ── SSE ── */"
+"/* -- SSE -- */"
+"let __sse_backoff = 1000;"
 "function connectSSE(){"
-"const src=new EventSource('/events');"
-"src.onopen=()=>{"
-"document.getElementById('dot').classList.add('online');"
-"document.getElementById('status-label').textContent='Connected';"
-"};"
-"src.onerror=()=>{"
-"document.getElementById('dot').classList.remove('online');"
-"document.getElementById('status-label').textContent='Reconnecting…';"
-"};"
-"src.addEventListener('weight',e=>{"
-"const d=JSON.parse(e.data);"
-"// Parse grams from the server payload (server sends weight_g)"
-"let grams = parseFloat(d.weight_g);"
-"// If server reports pounds, convert to grams for internal state"
-"if (d.unit && d.unit==='lb') grams = grams * 453.592;"
-"if (d.unit && d.unit==='lb') grams = grams * 453.592;"
-"updateWeight(grams);"
-"});"
+"  try{"
+"    const src=new EventSource('/events');"
+"    src.onopen=()=>{"
+"      console.log('SSE: open');"
+"      __sse_backoff = 1000;"
+"      document.getElementById('dot').classList.add('online');"
+"      document.getElementById('status-label').textContent='Connected';"
+"    };"
+"    src.onerror=(err)=>{"
+"      console.error('SSE error', err);"
+"      document.getElementById('dot').classList.remove('online');"
+"      document.getElementById('status-label').textContent='Reconnecting...';"
+"      try{ src.close(); }catch(e){}"
+"      setTimeout(()=>{ __sse_backoff = Math.min(30000, __sse_backoff * 2); connectSSE(); }, __sse_backoff);"
+"    };"
+"    src.addEventListener('weight',e=>{"
+"      try{"
+"        const d=JSON.parse(e.data);"
+"        let grams = parseFloat(d.weight_g);"
+"        if (d.unit && d.unit==='lb') grams = grams * 453.592;"
+"        updateWeight(grams);"
+"      }catch(ex){ console.error('SSE parse error', ex, e.data); }"
+"    });"
+"  }catch(ex){ console.error('connectSSE failed', ex); setTimeout(connectSSE, __sse_backoff); }"
 "}"
 
-"/* ── REST helpers ── */"
+"/* -- REST helpers -- */"
 "async function doTare(){"
-"document.getElementById('tare-status').textContent='Taring…';"
+"document.getElementById('tare-status').textContent='Taring...';"
 "const r=await fetch('/api/tare',{method:'POST'});"
 "if(r.ok){resetStats();document.getElementById('tare-status').textContent='Tare complete!';toast('Tare applied');}"
 "else document.getElementById('tare-status').textContent='Tare failed!';"
@@ -314,7 +322,7 @@ static const char DASHBOARD_HTML[] =
 "setTimeout(loadStatus,10000);"
 "}"
 
-"/* ── Toast ── */"
+"/* -- Toast -- */"
 "let toastTimer;"
 "function toast(msg){"
 "const el=document.getElementById('toast');"
@@ -323,7 +331,7 @@ static const char DASHBOARD_HTML[] =
 "toastTimer=setTimeout(()=>el.classList.remove('show'),2500);"
 "}"
 
-"/* ── Chart init ── */"
+"/* -- Chart init -- */"
 "const ctx=document.getElementById('chart').getContext('2d');"
 "const chart=new Chart(ctx,{"
 "type:'line',"
@@ -337,7 +345,7 @@ static const char DASHBOARD_HTML[] =
 "y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}"
 "}}});"
 
-"/* ── Boot ── */"
+"/* -- Boot -- */"
 "connectSSE();"
 "loadStatus();"
 "</script>"
@@ -404,7 +412,24 @@ static esp_err_t handler_root(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_send(req, DASHBOARD_HTML, strlen(DASHBOARD_HTML));
+
+    /* Send the embedded HTML in chunks to avoid Content-Length mismatches
+     * or browser truncation issues on some networks. */
+    const char *p = DASHBOARD_HTML;
+    size_t remaining = strlen(DASHBOARD_HTML);
+    const size_t CHUNK_SZ = 1024;
+    while (remaining > 0) {
+        size_t tosend = remaining > CHUNK_SZ ? CHUNK_SZ : remaining;
+        esp_err_t r = httpd_resp_send_chunk(req, p, tosend);
+        if (r != ESP_OK) {
+            ESP_LOGW(TAG, "handler_root: send chunk failed r=%d", r);
+            return r;
+        }
+        p += tosend;
+        remaining -= tosend;
+    }
+    /* Terminate chunked transfer */
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -541,6 +566,18 @@ static esp_err_t handler_api_status(httpd_req_t *req)
 }
 
 /**
+ * @brief Debug endpoint returning current SSE client count.
+ */
+static esp_err_t handler_api_debug_sse_count(httpd_req_t *req)
+{
+    char buf[64];
+    snprintf(buf, sizeof(buf), "{\"sse_count\":%d}", s_sse_count);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, buf, strlen(buf));
+    return ESP_OK;
+}
+
+/**
  * @brief Handle an SSE subscription request (GET /events).
  *
  * Sends the HTTP/1.1 200 headers with Content-Type: text/event-stream
@@ -621,6 +658,7 @@ esp_err_t web_server_start(hx711_dev_t *dev)
         { .uri = "/api/tare",      .method = HTTP_POST, .handler = handler_api_tare },
         { .uri = "/api/calibrate", .method = HTTP_POST, .handler = handler_api_calibrate },
         { .uri = "/api/status",    .method = HTTP_GET,  .handler = handler_api_status },
+        { .uri = "/api/debug/sse_count", .method = HTTP_GET, .handler = handler_api_debug_sse_count },
         { .uri = "/events",        .method = HTTP_GET,  .handler = handler_sse },
     };
 
