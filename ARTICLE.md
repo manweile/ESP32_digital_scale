@@ -844,7 +844,7 @@ To verify: what does the system report for an unknown mass that produces 450 000
 weight = (450 000 − (−47 382)) / 431.0 = 497 382 / 431.0 ≈ 1153.9 g
 ```
 
-The scale factor is the single most important tunable in the system. The compile-time default (`CONFIG_SCALE_FACTOR = 430.0f`) is only an approximation; every physical build will produce a slightly different value depending on the mechanical geometry of the frame and the characteristics of the specific cell batch. Always calibrate with the platform assembled in its final configuration.
+The scale factor is the single most important tunable in the system. The compile-time default (`CONFIG_SCALE_FACTOR = -10420.86f`) is a close approximation; but every physical build will produce a slightly different value depending on the mechanical geometry of the frame and the characteristics of the specific cell batch. Always calibrate with the platform assembled in its final configuration.
 
 ---
 
